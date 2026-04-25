@@ -1,0 +1,12 @@
+# binaries
+sleutel
+sleutel-tui
+
+# test vault files
+*.slkv
+
+# Claude Code local settings
+.claude/
+
+# macOS
+.DS_Store
