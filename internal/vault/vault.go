@@ -256,8 +256,12 @@ func (v *Vault) ImportEntries(entries []model.Entry) error {
 	added := make([]model.Entry, 0, len(entries))
 	for _, e := range entries {
 		e.ID = uuid.New().String()
-		e.CreatedAt = now
-		e.UpdatedAt = now
+		if e.CreatedAt.IsZero() {
+			e.CreatedAt = now
+		}
+		if e.UpdatedAt.IsZero() {
+			e.UpdatedAt = now
+		}
 		added = append(added, e)
 	}
 	orig := v.entries
