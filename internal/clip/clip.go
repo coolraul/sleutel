@@ -3,8 +3,6 @@ package clip
 import (
 	"fmt"
 	"time"
-
-	"github.com/atotto/clipboard"
 )
 
 const ClearDelay = 30 * time.Second
@@ -14,14 +12,14 @@ const ClearDelay = 30 * time.Second
 // value is erased — if something else was copied in the meantime it is left
 // untouched.
 func Write(text string) error {
-	if err := clipboard.WriteAll(text); err != nil {
+	if err := writeAll(text); err != nil {
 		return fmt.Errorf("clipboard write: %w", err)
 	}
 	go func() {
 		time.Sleep(ClearDelay)
-		current, err := clipboard.ReadAll()
+		current, err := readAll()
 		if err == nil && current == text {
-			_ = clipboard.WriteAll("")
+			_ = writeAll("")
 		}
 	}()
 	return nil
