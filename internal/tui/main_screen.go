@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mms/sleutel/internal/clip"
 	"github.com/mms/sleutel/internal/model"
 )
 
@@ -35,6 +36,7 @@ type MainScreen struct {
 	filtered []model.Entry
 	search   textinput.Model
 	cursor   int
+	copied   bool
 	width    int
 	height   int
 }
@@ -98,7 +100,22 @@ func (m MainScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "n":
 			return m, func() tea.Msg { return openAddMsg{} }
+		case "c":
+			if len(m.filtered) > 0 {
+				e := m.filtered[m.cursor]
+				if e.Password != "" {
+					if err := clip.Write(e.Password); err == nil {
+						m.copied = true
+						return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+							return clipClearMsg{}
+						})
+					}
+				}
+			}
 		}
+
+	case clipClearMsg:
+		m.copied = false
 	}
 	return m, nil
 }
@@ -214,15 +231,21 @@ func (m MainScreen) View() string {
 	b.WriteString("\n")
 	b.WriteString(divider)
 	b.WriteString("\n")
-	if m.search.Focused() {
+	switch {
+	case m.search.Focused():
 		b.WriteString(styleStatus.Render(
 			styleKey.Render("enter") + " confirm   " +
 				styleKey.Render("esc") + " clear",
 		))
-	} else {
+	case m.copied:
+		b.WriteString(styleConfirm.Render(
+			fmt.Sprintf("copied — clipboard clears in %ds", int(clip.ClearDelay.Seconds())),
+		))
+	default:
 		b.WriteString(styleStatus.Render(
 			styleKey.Render("↑↓/jk") + " navigate   " +
 				styleKey.Render("enter") + " open   " +
+				styleKey.Render("c") + " copy   " +
 				styleKey.Render("n") + " new   " +
 				styleKey.Render("/") + " search   " +
 				styleKey.Render("q") + " quit",
