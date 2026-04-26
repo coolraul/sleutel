@@ -3,9 +3,11 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mms/sleutel/internal/clip"
 	"github.com/mms/sleutel/internal/model"
 )
 
@@ -21,9 +23,12 @@ type detailScreen struct {
 	entry        model.Entry
 	showPassword bool
 	confirming   bool
+	copied       bool // true briefly after a successful clipboard write
 	width        int
 	height       int
 }
+
+type clipClearMsg struct{}
 
 func newDetailScreen(e model.Entry, width, height int) detailScreen {
 	return detailScreen{entry: e, width: width, height: height}
@@ -59,7 +64,19 @@ func (d detailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, func() tea.Msg { return openEditMsg{entry: e} }
 		case "d":
 			d.confirming = true
+		case "c":
+			if d.entry.Password != "" {
+				if err := clip.Write(d.entry.Password); err == nil {
+					d.copied = true
+					return d, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+						return clipClearMsg{}
+					})
+				}
+			}
 		}
+
+	case clipClearMsg:
+		d.copied = false
 	}
 	return d, nil
 }
@@ -95,9 +112,12 @@ func (d detailScreen) View() string {
 	b.WriteString("\n")
 	b.WriteString(divider)
 	b.WriteString("\n")
-	if d.confirming {
+	switch {
+	case d.confirming:
 		b.WriteString(styleConfirm.Render(fmt.Sprintf(`delete "%s"? [y/N]`, d.entry.Title)))
-	} else {
+	case d.copied:
+		b.WriteString(styleConfirm.Render(fmt.Sprintf("copied — clipboard clears in %ds", int(clip.ClearDelay.Seconds()))))
+	default:
 		hint := ""
 		if d.entry.Password != "" {
 			if d.showPassword {
@@ -105,6 +125,7 @@ func (d detailScreen) View() string {
 			} else {
 				hint = styleKey.Render("p") + styleStatus.Render(" show password   ")
 			}
+			hint += styleKey.Render("c") + styleStatus.Render(" copy password   ")
 		}
 		hint += styleKey.Render("e") + styleStatus.Render(" edit   ")
 		hint += styleKey.Render("d") + styleStatus.Render(" delete   ")

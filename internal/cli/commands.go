@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	"github.com/mms/sleutel/internal/clip"
 	"github.com/mms/sleutel/internal/crypto"
 	"github.com/mms/sleutel/internal/model"
 	"github.com/mms/sleutel/internal/tui"
@@ -148,6 +149,7 @@ func newAddCmd(vaultPath *string) *cobra.Command {
 
 func newGetCmd(vaultPath *string) *cobra.Command {
 	var showPassword bool
+	var toClip bool
 
 	cmd := &cobra.Command{
 		Use:   "get <id>",
@@ -170,11 +172,24 @@ func newGetCmd(vaultPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			if toClip {
+				if e.Password == "" {
+					return fmt.Errorf("entry has no password")
+				}
+				if err := clip.Write(e.Password); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Password copied to clipboard. Clears in %ds.\n", int(clip.ClearDelay.Seconds()))
+				return nil
+			}
+
 			printEntry(cmd.OutOrStdout(), e, showPassword)
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&showPassword, "show", false, "reveal password in output")
+	cmd.Flags().BoolVar(&toClip, "clip", false, "copy password to clipboard")
 	return cmd
 }
 
