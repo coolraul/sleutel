@@ -46,8 +46,6 @@ func NewRootCmd(defaultVaultPath string) *cobra.Command {
 		newGenerateCmd(),
 		newExportCmd(&vaultPath),
 		newImportCmd(&vaultPath),
-		newLockCmd(),
-		newUnlockCmd(),
 		newTUICmd(&vaultPath),
 	)
 
@@ -553,30 +551,6 @@ func newTUICmd(vaultPath *string) *cobra.Command {
 			)
 			_, err := p.Run()
 			return err
-		},
-	}
-}
-
-// --- lock / unlock (phase 1 placeholders) ---
-
-func newLockCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "lock",
-		Short: "Lock the vault (session management, phase 2)",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), "Session management is not implemented in phase 1. The vault is always locked at rest.")
-			return nil
-		},
-	}
-}
-
-func newUnlockCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "unlock",
-		Short: "Unlock the vault (session management, phase 2)",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), "Session management is not implemented in phase 1. Use any command — you will be prompted for your master password.")
-			return nil
 		},
 	}
 }
