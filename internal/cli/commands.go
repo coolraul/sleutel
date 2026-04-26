@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -426,7 +427,6 @@ WARNING: the export file is NOT encrypted. Store it securely and delete it when 
 
 func newImportCmd(vaultPath *string) *cobra.Command {
 	var inFile string
-	var useXML bool
 
 	cmd := &cobra.Command{
 		Use:   "import",
@@ -442,7 +442,7 @@ func newImportCmd(vaultPath *string) *cobra.Command {
 			}
 
 			var entries []model.Entry
-			if useXML {
+			if strings.ToLower(filepath.Ext(inFile)) == ".xml" {
 				entries, err = parseXMLEntries(data)
 				if err != nil {
 					return fmt.Errorf("parse XML: %w", err)
@@ -472,8 +472,7 @@ func newImportCmd(vaultPath *string) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&inFile, "file", "f", "", "JSON or XML file to import (required)")
-	cmd.Flags().BoolVar(&useXML, "xml", false, "parse file as XML exported from the legacy password manager")
+	cmd.Flags().StringVarP(&inFile, "file", "f", "", "JSON or XML file to import (required); format detected from extension")
 	return cmd
 }
 
