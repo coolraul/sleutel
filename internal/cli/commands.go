@@ -26,6 +26,11 @@ func NewRootCmd(defaultVaultPath string) *cobra.Command {
 	}
 	root.PersistentFlags().StringVarP(&vaultPath, "vault", "v", defaultVaultPath, "path to vault file")
 
+	// Default to TUI when invoked with no subcommand.
+	root.RunE = func(cmd *cobra.Command, args []string) error {
+		return newTUICmd(&vaultPath).RunE(cmd, args)
+	}
+
 	root.AddCommand(
 		newInitCmd(&vaultPath),
 		newAddCmd(&vaultPath),
