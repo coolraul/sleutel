@@ -87,10 +87,30 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case submitAddMsg:
 		if a.v != nil {
-			a.v.Add(msg.entry)
+			added, err := a.v.Add(msg.entry)
 			a.main = NewMainScreen(a.v.List())
 			a.main.width = a.form.width
 			a.main.height = a.form.height
+			if err == nil {
+				a.detail = newDetailScreen(added, a.form.width, a.form.height)
+				a.active = screenDetail
+				return a, nil
+			}
+		}
+		a.active = screenMain
+		return a, nil
+
+	case submitAddOpenQAMsg:
+		if a.v != nil {
+			added, err := a.v.Add(msg.entry)
+			a.main = NewMainScreen(a.v.List())
+			a.main.width = a.form.width
+			a.main.height = a.form.height
+			if err == nil {
+				a.qa = newQAScreen(added, a.form.width, a.form.height)
+				a.active = screenQA
+				return a, nil
+			}
 		}
 		a.active = screenMain
 		return a, nil
@@ -114,6 +134,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case closeQAMsg:
+		w, h := a.main.width, a.main.height
+		a.main = NewMainScreen(a.v.List())
+		a.main.width = w
+		a.main.height = h
 		a.detail = newDetailScreen(msg.entry, a.qa.width, a.qa.height)
 		a.active = screenDetail
 		return a, nil

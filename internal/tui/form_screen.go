@@ -30,6 +30,7 @@ const (
 )
 
 type submitAddMsg struct{ entry model.Entry }
+type submitAddOpenQAMsg struct{ entry model.Entry }
 type submitEditMsg struct {
 	id    string
 	entry model.Entry
@@ -97,6 +98,11 @@ func (f formScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+s":
 			return f.submit()
 
+		case "ctrl+q":
+			if f.editID == "" {
+				return f.submitOpenQA()
+			}
+
 		case "ctrl+g":
 			pw, err := vault.GeneratePassword(24, true)
 			if err == nil {
@@ -133,25 +139,41 @@ func (f formScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return f, cmd
 }
 
-func (f formScreen) submit() (tea.Model, tea.Cmd) {
+func (f formScreen) buildEntry() (model.Entry, bool) {
 	title := strings.TrimSpace(f.fields[fldTitle].Value())
 	if title == "" {
-		f.errMsg = "Title is required"
-		return f, nil
+		return model.Entry{}, false
 	}
-	e := model.Entry{
+	return model.Entry{
 		Title:    title,
 		Username: strings.TrimSpace(f.fields[fldUsername].Value()),
 		Password: f.fields[fldPassword].Value(),
 		URL:      strings.TrimSpace(f.fields[fldURL].Value()),
 		Notes:    strings.TrimSpace(f.fields[fldNotes].Value()),
 		Tags:     parseTags(f.fields[fldTags].Value()),
+	}, true
+}
+
+func (f formScreen) submit() (tea.Model, tea.Cmd) {
+	e, ok := f.buildEntry()
+	if !ok {
+		f.errMsg = "Title is required"
+		return f, nil
 	}
 	if f.editID != "" {
 		id := f.editID
 		return f, func() tea.Msg { return submitEditMsg{id: id, entry: e} }
 	}
 	return f, func() tea.Msg { return submitAddMsg{entry: e} }
+}
+
+func (f formScreen) submitOpenQA() (tea.Model, tea.Cmd) {
+	e, ok := f.buildEntry()
+	if !ok {
+		f.errMsg = "Title is required"
+		return f, nil
+	}
+	return f, func() tea.Msg { return submitAddOpenQAMsg{entry: e} }
 }
 
 func (f formScreen) View() string {
@@ -199,12 +221,14 @@ func (f formScreen) View() string {
 	b.WriteString("\n")
 	b.WriteString(divider)
 	b.WriteString("\n")
-	b.WriteString(styleStatus.Render(
-		styleKey.Render("tab") + " next   " +
-			styleKey.Render("shift+tab") + " prev   " +
-			styleKey.Render("ctrl+s") + " save   " +
-			styleKey.Render("esc") + " cancel",
-	))
+	hint := styleKey.Render("tab") + " next   " +
+		styleKey.Render("shift+tab") + " prev   " +
+		styleKey.Render("ctrl+s") + " save   " +
+		styleKey.Render("esc") + " cancel"
+	if f.editID == "" {
+		hint += "   " + styleKey.Render("ctrl+q") + " save & security q"
+	}
+	b.WriteString(styleStatus.Render(hint))
 
 	return b.String()
 }
