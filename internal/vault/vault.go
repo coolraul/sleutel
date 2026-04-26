@@ -163,6 +163,67 @@ func (v *Vault) Delete(id string) error {
 	return fmt.Errorf("entry not found: %s", id)
 }
 
+// AddSecurityQuestion appends a security question to the entry and saves.
+func (v *Vault) AddSecurityQuestion(entryID string, sq model.SecurityQuestion) (model.Entry, error) {
+	for i, e := range v.entries {
+		if e.ID != entryID {
+			continue
+		}
+		orig := v.entries[i]
+		v.entries[i].SecurityQuestions = append(v.entries[i].SecurityQuestions, sq)
+		v.entries[i].UpdatedAt = time.Now().UTC()
+		if err := v.save(); err != nil {
+			v.entries[i] = orig
+			return model.Entry{}, err
+		}
+		return v.entries[i], nil
+	}
+	return model.Entry{}, fmt.Errorf("entry not found: %s", entryID)
+}
+
+// UpdateSecurityQuestion replaces the security question at idx and saves.
+func (v *Vault) UpdateSecurityQuestion(entryID string, idx int, sq model.SecurityQuestion) (model.Entry, error) {
+	for i, e := range v.entries {
+		if e.ID != entryID {
+			continue
+		}
+		if idx < 0 || idx >= len(v.entries[i].SecurityQuestions) {
+			return model.Entry{}, fmt.Errorf("security question index out of range: %d", idx)
+		}
+		orig := v.entries[i]
+		v.entries[i].SecurityQuestions[idx] = sq
+		v.entries[i].UpdatedAt = time.Now().UTC()
+		if err := v.save(); err != nil {
+			v.entries[i] = orig
+			return model.Entry{}, err
+		}
+		return v.entries[i], nil
+	}
+	return model.Entry{}, fmt.Errorf("entry not found: %s", entryID)
+}
+
+// DeleteSecurityQuestion removes the security question at idx and saves.
+func (v *Vault) DeleteSecurityQuestion(entryID string, idx int) (model.Entry, error) {
+	for i, e := range v.entries {
+		if e.ID != entryID {
+			continue
+		}
+		if idx < 0 || idx >= len(v.entries[i].SecurityQuestions) {
+			return model.Entry{}, fmt.Errorf("security question index out of range: %d", idx)
+		}
+		orig := v.entries[i]
+		sqs := v.entries[i].SecurityQuestions
+		v.entries[i].SecurityQuestions = append(sqs[:idx], sqs[idx+1:]...)
+		v.entries[i].UpdatedAt = time.Now().UTC()
+		if err := v.save(); err != nil {
+			v.entries[i] = orig
+			return model.Entry{}, err
+		}
+		return v.entries[i], nil
+	}
+	return model.Entry{}, fmt.Errorf("entry not found: %s", entryID)
+}
+
 // List returns all entries (no passwords exposed).
 func (v *Vault) List() []model.Entry {
 	out := make([]model.Entry, len(v.entries))

@@ -3,6 +3,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mms/sleutel/internal/crypto"
+	"github.com/mms/sleutel/internal/model"
 	"github.com/mms/sleutel/internal/vault"
 )
 
@@ -14,6 +15,8 @@ const (
 	screenDetail
 	screenAdd
 	screenEdit
+	screenQA
+	screenQAForm
 )
 
 type vaultOpenedMsg struct {
@@ -31,6 +34,8 @@ type App struct {
 	main      MainScreen
 	detail    detailScreen
 	form      formScreen
+	qa        qaScreen
+	qaForm    qaFormScreen
 }
 
 func NewApp(vaultPath string) App {
@@ -103,6 +108,54 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.active = screenDetail
 		return a, nil
 
+	case openQAMsg:
+		a.qa = newQAScreen(msg.entry, a.detail.width, a.detail.height)
+		a.active = screenQA
+		return a, nil
+
+	case closeQAMsg:
+		a.detail = newDetailScreen(msg.entry, a.qa.width, a.qa.height)
+		a.active = screenDetail
+		return a, nil
+
+	case openQAFormMsg:
+		a.qaForm = newQAFormScreen(msg.entryID, msg.idx, msg.sq, a.qa.width, a.qa.height)
+		a.active = screenQAForm
+		return a, a.qaForm.Init()
+
+	case submitQAFormMsg:
+		if a.v != nil {
+			var updated model.Entry
+			var err error
+			if msg.idx < 0 {
+				updated, err = a.v.AddSecurityQuestion(msg.entryID, msg.sq)
+			} else {
+				updated, err = a.v.UpdateSecurityQuestion(msg.entryID, msg.idx, msg.sq)
+			}
+			if err == nil {
+				a.qa.entry = updated
+			}
+		}
+		a.active = screenQA
+		return a, nil
+
+	case deleteQAMsg:
+		if a.v != nil {
+			updated, err := a.v.DeleteSecurityQuestion(msg.entryID, msg.idx)
+			if err == nil {
+				a.qa.entry = updated
+				if a.qa.cursor >= len(updated.SecurityQuestions) && a.qa.cursor > 0 {
+					a.qa.cursor--
+				}
+			}
+		}
+		a.active = screenQA
+		return a, nil
+
+	case cancelQAFormMsg:
+		a.active = screenQA
+		return a, nil
+
 	case deleteEntryMsg:
 		if a.v != nil {
 			a.v.Delete(msg.id)
@@ -131,6 +184,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.detail.height = msg.Height
 		a.form.width = msg.Width
 		a.form.height = msg.Height
+		a.qa.width = msg.Width
+		a.qa.height = msg.Height
+		a.qaForm.width = msg.Width
+		a.qaForm.height = msg.Height
 		return a, nil
 	}
 
@@ -164,6 +221,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		next, cmd := a.form.Update(msg)
 		a.form = next.(formScreen)
 		return a, cmd
+
+	case screenQA:
+		next, cmd := a.qa.Update(msg)
+		a.qa = next.(qaScreen)
+		return a, cmd
+
+	case screenQAForm:
+		next, cmd := a.qaForm.Update(msg)
+		a.qaForm = next.(qaFormScreen)
+		return a, cmd
 	}
 
 	return a, nil
@@ -179,6 +246,10 @@ func (a App) View() string {
 		return a.detail.View()
 	case screenAdd, screenEdit:
 		return a.form.View()
+	case screenQA:
+		return a.qa.View()
+	case screenQAForm:
+		return a.qaForm.View()
 	}
 	return ""
 }

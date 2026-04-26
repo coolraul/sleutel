@@ -64,6 +64,9 @@ func (d detailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, func() tea.Msg { return openEditMsg{entry: e} }
 		case "d":
 			d.confirming = true
+		case "s":
+			e := d.entry
+			return d, func() tea.Msg { return openQAMsg{entry: e} }
 		case "c":
 			if d.entry.Password != "" {
 				if err := clip.Write(d.entry.Password); err == nil {
@@ -103,6 +106,13 @@ func (d detailScreen) View() string {
 	if len(d.entry.Tags) > 0 {
 		d.writeField(&b, "Tags", strings.Join(d.entry.Tags, ", "))
 	}
+	if n := len(d.entry.SecurityQuestions); n > 0 {
+		noun := "question"
+		if n > 1 {
+			noun = "questions"
+		}
+		d.writeField(&b, "Security", fmt.Sprintf("%d %s — press s to manage", n, noun))
+	}
 	b.WriteString("\n")
 	d.writeField(&b, "ID", d.entry.ID)
 	d.writeField(&b, "Created", d.entry.CreatedAt.Format("2006-01-02 15:04:05"))
@@ -128,6 +138,7 @@ func (d detailScreen) View() string {
 			hint += styleKey.Render("c") + styleStatus.Render(" copy password   ")
 		}
 		hint += styleKey.Render("e") + styleStatus.Render(" edit   ")
+		hint += styleKey.Render("s") + styleStatus.Render(" security q   ")
 		hint += styleKey.Render("d") + styleStatus.Render(" delete   ")
 		hint += styleKey.Render("esc") + styleStatus.Render(" back")
 		b.WriteString(styleStatus.Render(hint))

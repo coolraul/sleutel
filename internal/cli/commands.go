@@ -536,6 +536,16 @@ func printEntry(w interface{ Write([]byte) (int, error) }, e model.Entry, showPw
 	if len(e.Tags) > 0 {
 		fmt.Fprintf(w, "Tags:     %s\n", strings.Join(e.Tags, ", "))
 	}
+	if len(e.SecurityQuestions) > 0 {
+		fmt.Fprintf(w, "Security questions:\n")
+		for i, sq := range e.SecurityQuestions {
+			answer := "********"
+			if showPw {
+				answer = sq.Answer
+			}
+			fmt.Fprintf(w, "  %d. %s\n     %s\n", i+1, sq.Question, answer)
+		}
+	}
 	fmt.Fprintf(w, "Created:  %s\n", e.CreatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(w, "Updated:  %s\n", e.UpdatedAt.Format("2006-01-02 15:04:05"))
 }
