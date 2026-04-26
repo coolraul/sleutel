@@ -2,10 +2,12 @@ package cli
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -424,10 +426,11 @@ WARNING: the export file is NOT encrypted. Store it securely and delete it when 
 
 func newImportCmd(vaultPath *string) *cobra.Command {
 	var inFile string
+	var useXML bool
 
 	cmd := &cobra.Command{
 		Use:   "import",
-		Short: "Import entries from a JSON export file",
+		Short: "Import entries from a JSON or XML export file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if inFile == "" {
 				return fmt.Errorf("--file is required")
@@ -439,8 +442,15 @@ func newImportCmd(vaultPath *string) *cobra.Command {
 			}
 
 			var entries []model.Entry
-			if err := json.Unmarshal(data, &entries); err != nil {
-				return fmt.Errorf("parse JSON: %w", err)
+			if useXML {
+				entries, err = parseXMLEntries(data)
+				if err != nil {
+					return fmt.Errorf("parse XML: %w", err)
+				}
+			} else {
+				if err := json.Unmarshal(data, &entries); err != nil {
+					return fmt.Errorf("parse JSON: %w", err)
+				}
 			}
 
 			pw, err := openVaultPassword()
@@ -462,8 +472,70 @@ func newImportCmd(vaultPath *string) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&inFile, "file", "f", "", "JSON file to import (required)")
+	cmd.Flags().StringVarP(&inFile, "file", "f", "", "JSON or XML file to import (required)")
+	cmd.Flags().BoolVar(&useXML, "xml", false, "parse file as XML exported from the legacy password manager")
 	return cmd
+}
+
+// xmlContent mirrors the root element of the legacy password manager export.
+type xmlContent struct {
+	Entries []xmlEntry `xml:"entries>entry"`
+}
+
+type xmlEntry struct {
+	Name              string         `xml:"name"`
+	ID                string         `xml:"id"`
+	Password          string         `xml:"password"`
+	Description       string         `xml:"description"`
+	Created           string         `xml:"created"`
+	LastUpdated       string         `xml:"lastupdated"`
+	URL               string         `xml:"url"`
+	SecurityQuestions []xmlSecurityQ `xml:"security_question"`
+}
+
+type xmlSecurityQ struct {
+	Question string `xml:"question"`
+	Answer   string `xml:"answer"`
+}
+
+const xmlDateLayout = "01/02/2006 03:04:05 PM"
+
+func parseXMLEntries(data []byte) ([]model.Entry, error) {
+	var content xmlContent
+	if err := xml.Unmarshal(data, &content); err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	entries := make([]model.Entry, 0, len(content.Entries))
+	for _, x := range content.Entries {
+		createdAt, err := time.ParseInLocation(xmlDateLayout, x.Created, time.Local)
+		if err != nil {
+			createdAt = now
+		}
+		updatedAt, err := time.ParseInLocation(xmlDateLayout, x.LastUpdated, time.Local)
+		if err != nil {
+			updatedAt = now
+		}
+
+		e := model.Entry{
+			Title:     x.Name,
+			Username:  x.ID,
+			Password:  x.Password,
+			URL:       x.URL,
+			Notes:     x.Description,
+			CreatedAt: createdAt.UTC(),
+			UpdatedAt: updatedAt.UTC(),
+		}
+		for _, sq := range x.SecurityQuestions {
+			e.SecurityQuestions = append(e.SecurityQuestions, model.SecurityQuestion{
+				Question: sq.Question,
+				Answer:   sq.Answer,
+			})
+		}
+		entries = append(entries, e)
+	}
+	return entries, nil
 }
 
 // --- tui ---
