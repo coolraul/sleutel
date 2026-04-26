@@ -10,18 +10,19 @@ import (
 )
 
 var (
-	styleDetailTitle  = lipgloss.NewStyle().Bold(true).Foreground(accent).Padding(0, 1)
-	styleFieldLabel   = lipgloss.NewStyle().Foreground(fgDim).Width(12).Padding(0, 1)
-	styleFieldValue   = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
-	styleFieldMasked  = lipgloss.NewStyle().Foreground(subtle).Padding(0, 1)
-	styleHint         = lipgloss.NewStyle().Foreground(fgDim).Italic(true).Padding(0, 1)
+	styleDetailTitle = lipgloss.NewStyle().Bold(true).Foreground(accent).Padding(0, 1)
+	styleFieldLabel  = lipgloss.NewStyle().Foreground(fgDim).Width(12).Padding(0, 1)
+	styleFieldValue  = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
+	styleFieldMasked = lipgloss.NewStyle().Foreground(subtle).Padding(0, 1)
+	styleConfirm     = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff4444")).Bold(true).Padding(0, 1)
 )
 
 type detailScreen struct {
-	entry       model.Entry
+	entry        model.Entry
 	showPassword bool
-	width       int
-	height      int
+	confirming   bool
+	width        int
+	height       int
 }
 
 func newDetailScreen(e model.Entry, width, height int) detailScreen {
@@ -30,12 +31,24 @@ func newDetailScreen(e model.Entry, width, height int) detailScreen {
 
 type closeDetailMsg struct{}
 type openEditMsg struct{ entry model.Entry }
+type deleteEntryMsg struct{ id string }
 
 func (d detailScreen) Init() tea.Cmd { return nil }
 
 func (d detailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if d.confirming {
+			switch msg.String() {
+			case "y", "Y":
+				id := d.entry.ID
+				return d, func() tea.Msg { return deleteEntryMsg{id: id} }
+			default:
+				d.confirming = false
+			}
+			return d, nil
+		}
+
 		switch msg.String() {
 		case "esc", "q":
 			return d, func() tea.Msg { return closeDetailMsg{} }
@@ -44,6 +57,8 @@ func (d detailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "e":
 			e := d.entry
 			return d, func() tea.Msg { return openEditMsg{entry: e} }
+		case "d":
+			d.confirming = true
 		}
 	}
 	return d, nil
@@ -77,18 +92,25 @@ func (d detailScreen) View() string {
 	d.writeField(&b, "Updated", d.entry.UpdatedAt.Format("2006-01-02 15:04:05"))
 
 	// Status bar
-	hint := ""
-	if d.entry.Password != "" {
-		if d.showPassword {
-			hint = styleKey.Render("p") + styleStatus.Render(" hide password   ")
-		} else {
-			hint = styleKey.Render("p") + styleStatus.Render(" show password   ")
+	b.WriteString("\n")
+	b.WriteString(divider)
+	b.WriteString("\n")
+	if d.confirming {
+		b.WriteString(styleConfirm.Render(fmt.Sprintf(`delete "%s"? [y/N]`, d.entry.Title)))
+	} else {
+		hint := ""
+		if d.entry.Password != "" {
+			if d.showPassword {
+				hint = styleKey.Render("p") + styleStatus.Render(" hide password   ")
+			} else {
+				hint = styleKey.Render("p") + styleStatus.Render(" show password   ")
+			}
 		}
+		hint += styleKey.Render("e") + styleStatus.Render(" edit   ")
+		hint += styleKey.Render("d") + styleStatus.Render(" delete   ")
+		hint += styleKey.Render("esc") + styleStatus.Render(" back")
+		b.WriteString(styleStatus.Render(hint))
 	}
-	hint += styleKey.Render("e") + styleStatus.Render(" edit   ")
-	hint += styleKey.Render("esc") + styleStatus.Render(" back")
-
-	b.WriteString(fmt.Sprintf("\n%s\n%s\n", divider, styleStatus.Render(hint)))
 
 	return b.String()
 }

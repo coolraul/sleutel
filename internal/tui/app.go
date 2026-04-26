@@ -103,6 +103,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.active = screenDetail
 		return a, nil
 
+	case deleteEntryMsg:
+		if a.v != nil {
+			a.v.Delete(msg.id)
+			a.main = NewMainScreen(a.v.List())
+			a.main.width = a.detail.width
+			a.main.height = a.detail.height
+		}
+		a.active = screenMain
+		return a, nil
+
 	case cancelFormMsg:
 		// Return to wherever made sense: detail if editing, main if adding.
 		if a.active == screenEdit {
