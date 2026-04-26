@@ -13,6 +13,7 @@ const (
 	screenMain
 	screenDetail
 	screenAdd
+	screenEdit
 )
 
 type vaultOpenedMsg struct {
@@ -70,8 +71,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case openAddMsg:
-		a.form = newFormScreen(a.main.width, a.main.height)
+		a.form = newAddFormScreen(a.main.width, a.main.height)
 		a.active = screenAdd
+		return a, a.form.Init()
+
+	case openEditMsg:
+		a.form = newEditFormScreen(msg.entry, a.detail.width, a.detail.height)
+		a.active = screenEdit
 		return a, a.form.Init()
 
 	case submitAddMsg:
@@ -84,8 +90,26 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.active = screenMain
 		return a, nil
 
+	case submitEditMsg:
+		if a.v != nil {
+			updated, err := a.v.Edit(msg.id, msg.entry)
+			if err == nil {
+				a.detail = newDetailScreen(updated, a.form.width, a.form.height)
+				a.main = NewMainScreen(a.v.List())
+				a.main.width = a.form.width
+				a.main.height = a.form.height
+			}
+		}
+		a.active = screenDetail
+		return a, nil
+
 	case cancelFormMsg:
-		a.active = screenMain
+		// Return to wherever made sense: detail if editing, main if adding.
+		if a.active == screenEdit {
+			a.active = screenDetail
+		} else {
+			a.active = screenMain
+		}
 		return a, nil
 
 	case tea.WindowSizeMsg:
@@ -126,7 +150,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.detail = next.(detailScreen)
 		return a, cmd
 
-	case screenAdd:
+	case screenAdd, screenEdit:
 		next, cmd := a.form.Update(msg)
 		a.form = next.(formScreen)
 		return a, cmd
@@ -143,7 +167,7 @@ func (a App) View() string {
 		return a.main.View()
 	case screenDetail:
 		return a.detail.View()
-	case screenAdd:
+	case screenAdd, screenEdit:
 		return a.form.View()
 	}
 	return ""

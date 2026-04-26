@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	styleFormTitle  = lipgloss.NewStyle().Bold(true).Foreground(accent).MarginBottom(1)
-	styleLabel      = lipgloss.NewStyle().Foreground(fgDim).Width(12)
-	styleRequired   = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	styleFormHint   = lipgloss.NewStyle().Foreground(subtle).MarginLeft(2)
-	styleFormError  = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff4444"))
+	styleFormTitle = lipgloss.NewStyle().Bold(true).Foreground(accent).MarginBottom(1)
+	styleLabel     = lipgloss.NewStyle().Foreground(fgDim).Width(12)
+	styleRequired  = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	styleFormHint  = lipgloss.NewStyle().Foreground(subtle).MarginLeft(2)
+	styleFormError = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff4444"))
 )
 
 const (
@@ -30,20 +30,41 @@ const (
 )
 
 type submitAddMsg struct{ entry model.Entry }
+type submitEditMsg struct {
+	id    string
+	entry model.Entry
+}
 type cancelFormMsg struct{}
 
 type formScreen struct {
 	fields  [fldCount]textinput.Model
 	focused int
+	editID  string // non-empty means edit mode
 	showPw  bool
 	errMsg  string
 	width   int
 	height  int
 }
 
-func newFormScreen(width, height int) formScreen {
+func newAddFormScreen(width, height int) formScreen {
+	return buildForm("", model.Entry{}, width, height)
+}
+
+func newEditFormScreen(e model.Entry, width, height int) formScreen {
+	return buildForm(e.ID, e, width, height)
+}
+
+func buildForm(editID string, e model.Entry, width, height int) formScreen {
 	labels := []string{"Title", "Username", "Password", "URL", "Notes", "Tags"}
 	placeholders := []string{"", "", "", "https://", "", "dev, work"}
+	values := []string{
+		e.Title,
+		e.Username,
+		e.Password,
+		e.URL,
+		e.Notes,
+		strings.Join(e.Tags, ", "),
+	}
 
 	var fields [fldCount]textinput.Model
 	for i := range fields {
@@ -52,6 +73,7 @@ func newFormScreen(width, height int) formScreen {
 		ti.CharLimit = 256
 		ti.Width = 40
 		ti.Prompt = styleLabel.Render(labels[i]+" ") + " "
+		ti.SetValue(values[i])
 		if i == fldPassword {
 			ti.EchoMode = textinput.EchoPassword
 			ti.EchoCharacter = '•'
@@ -60,7 +82,7 @@ func newFormScreen(width, height int) formScreen {
 	}
 	fields[fldTitle].Focus()
 
-	return formScreen{fields: fields, width: width, height: height}
+	return formScreen{fields: fields, editID: editID, width: width, height: height}
 }
 
 func (f formScreen) Init() tea.Cmd { return textinput.Blink }
@@ -125,6 +147,10 @@ func (f formScreen) submit() (tea.Model, tea.Cmd) {
 		Notes:    strings.TrimSpace(f.fields[fldNotes].Value()),
 		Tags:     parseTags(f.fields[fldTags].Value()),
 	}
+	if f.editID != "" {
+		id := f.editID
+		return f, func() tea.Msg { return submitEditMsg{id: id, entry: e} }
+	}
 	return f, func() tea.Msg { return submitAddMsg{entry: e} }
 }
 
@@ -136,7 +162,11 @@ func (f formScreen) View() string {
 	var b strings.Builder
 	divider := styleDivider.Render(strings.Repeat("─", f.width))
 
-	b.WriteString(styleFormTitle.Render("Add Entry"))
+	title := "Add Entry"
+	if f.editID != "" {
+		title = "Edit Entry"
+	}
+	b.WriteString(styleFormTitle.Render(title))
 	b.WriteString("\n")
 	b.WriteString(divider)
 	b.WriteString("\n\n")

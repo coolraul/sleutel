@@ -29,6 +29,7 @@ func newDetailScreen(e model.Entry, width, height int) detailScreen {
 }
 
 type closeDetailMsg struct{}
+type openEditMsg struct{ entry model.Entry }
 
 func (d detailScreen) Init() tea.Cmd { return nil }
 
@@ -40,6 +41,9 @@ func (d detailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, func() tea.Msg { return closeDetailMsg{} }
 		case "p":
 			d.showPassword = !d.showPassword
+		case "e":
+			e := d.entry
+			return d, func() tea.Msg { return openEditMsg{entry: e} }
 		}
 	}
 	return d, nil
@@ -81,6 +85,7 @@ func (d detailScreen) View() string {
 			hint = styleKey.Render("p") + styleStatus.Render(" show password   ")
 		}
 	}
+	hint += styleKey.Render("e") + styleStatus.Render(" edit   ")
 	hint += styleKey.Render("esc") + styleStatus.Render(" back")
 
 	b.WriteString(fmt.Sprintf("\n%s\n%s\n", divider, styleStatus.Render(hint)))
