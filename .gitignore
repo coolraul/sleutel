@@ -1,6 +1,6 @@
 # binaries
-sleutel
-sleutel-tui
+/sleutel
+/sleutel-tui
 
 # test vault files
 *.slkv
