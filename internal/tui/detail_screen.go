@@ -23,7 +23,8 @@ type detailScreen struct {
 	entry        model.Entry
 	showPassword bool
 	confirming   bool
-	copied       bool // true briefly after a successful clipboard write
+	copied       bool   // true briefly after a successful clipboard write
+	copyErr      string // non-empty briefly after a failed clipboard write
 	width        int
 	height       int
 }
@@ -69,17 +70,22 @@ func (d detailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, func() tea.Msg { return openQAMsg{entry: e} }
 		case "c":
 			if d.entry.Password != "" {
-				if err := clip.Write(d.entry.Password); err == nil {
-					d.copied = true
-					return d, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+				if err := clip.Write(d.entry.Password); err != nil {
+					d.copyErr = err.Error()
+					return d, tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
 						return clipClearMsg{}
 					})
 				}
+				d.copied = true
+				return d, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+					return clipClearMsg{}
+				})
 			}
 		}
 
 	case clipClearMsg:
 		d.copied = false
+		d.copyErr = ""
 	}
 	return d, nil
 }
@@ -125,6 +131,8 @@ func (d detailScreen) View() string {
 	switch {
 	case d.confirming:
 		b.WriteString(styleConfirm.Render(fmt.Sprintf(`delete "%s"? [y/N]`, d.entry.Title)))
+	case d.copyErr != "":
+		b.WriteString(styleConfirm.Render("copy failed: " + d.copyErr))
 	case d.copied:
 		b.WriteString(styleConfirm.Render(fmt.Sprintf("copied — clipboard clears in %ds", int(clip.ClearDelay.Seconds()))))
 	default:
